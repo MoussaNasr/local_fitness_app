@@ -107,6 +107,10 @@ thead th { color: var(--muted); font-weight: 700; font-size: 12px; text-transfor
 tbody tr:hover { background: color-mix(in srgb, var(--panel-2) 60%, transparent); }
 .tag { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; border: 1px solid var(--border); color: var(--muted); }
 
+/* Scrollable tables for mobile */
+.table-scroll { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.table-scroll table { min-width: 700px; }
+
 /* Details/summary */
 details { border: 1px solid var(--border); border-radius: 12px; margin: 10px 0; overflow: hidden; background: var(--panel); }
 summary { cursor: pointer; padding: 10px 12px; list-style: none; display: flex; align-items: center; gap: 10px; }
@@ -135,3 +139,22 @@ canvas { max-width: 100%; height: auto; }
 
 /* Utilities */
 .hidden { display: none !important; }
+
+/* Done row style (optional subtle) */
+.row-done { opacity: .75; }
+.row-done td:first-child { text-decoration: none; }
+
+/* Mobile-friendly tweaks */
+@media (max-width: 640px) {
+  body { padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 8px); }
+  .nav { gap: 8px; flex-wrap: wrap; }
+  .tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 6px; }
+  .tab { padding: 10px 14px; font-size: 15px; }
+  .card { padding: 14px; }
+  .btn, button { padding: 12px 14px; font-size: 16px; }
+  input[type="number"], input[type="text"], select, textarea { padding: 12px 14px; font-size: 16px; }
+  summary { padding: 14px 14px; font-size: 16px; }
+  th, td { padding: 10px 8px; }
+  .timer-display { font-size: 18px; }
+  input[type="checkbox"] { width: 22px; height: 22px; }
+}

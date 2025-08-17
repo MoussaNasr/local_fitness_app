@@ -75,6 +75,7 @@ const LOG_KEY_PREFIX = 'hybridStrengthLog_';
 const THEME_KEY = 'hybridTheme';
 const EXERCISE_MAP_KEY = 'hybridExerciseReplacements';
 const EQUIPMENT_KEY = 'hybridAvailableEquipment';
+const PLAN_DONE_PREFIX = 'hybridPlanDone_';
 let planReplaceBound = false;
 
 // Replacement catalog: per movement key, provide options with machine labels
@@ -377,8 +378,8 @@ function renderPlan(settings, options = {}) {
     details.appendChild(summary);
     const inner = document.createElement('div');
     inner.className = 'details-inner';
-    let html = '<table><thead><tr><th>Day</th><th>Exercise</th><th>Machine</th><th>Sets × Reps</th><th>Load / Cue</th><th>Replace</th></tr></thead><tbody>';
-    days.forEach((day) => {
+    let html = '<table><thead><tr><th>Day</th><th>Exercise</th><th>Machine</th><th>Sets × Reps</th><th>Load / Cue</th><th>Replace</th><th>Done</th></tr></thead><tbody>';
+    days.forEach((day, dayIndex) => {
       day.exercises.forEach((exercise, exIdx) => {
         // Auto-pick best exercise based on availability if user hasn't overridden
         const map = loadExerciseMap();
@@ -409,8 +410,11 @@ function renderPlan(settings, options = {}) {
           const disabled = availSet.size>0 && !availSet.has(o.machine) ? 'disabled' : '';
           return `<option value="${o.name}" ${sel} ${disabled}>${o.name}</option>`;
         }).join('');
-        const selectHtml = `<select class="replace-select" data-key="${exercise.key || exercise.name}">${opts}</select>`;
-        html += `<tr>${dayNameCell}<td>${currentName}</td><td>${machine}</td><td>${sets} × ${reps}</td><td>${loadCell}</td><td>${selectHtml}</td></tr>`;
+  const selectHtml = `<select class=\"replace-select\" data-key=\"${exercise.key || exercise.name}\">${opts}</select>`;
+  const doneKey = `${PLAN_DONE_PREFIX}${week}_${dayIndex+1}_${exIdx}`;
+  const isDone = localStorage.getItem(doneKey) === '1';
+  const doneHtml = `<input type=\"checkbox\" class=\"done-check\" data-week=\"${week}\" data-day=\"${dayIndex+1}\" data-ex=\"${exIdx}\" ${isDone?'checked':''}>`;
+  html += `<tr>${dayNameCell}<td>${currentName}</td><td>${machine}</td><td>${sets} × ${reps}</td><td>${loadCell}</td><td>${selectHtml}</td><td style=\"text-align:center;\">${doneHtml}</td></tr>`;
       });
     });
     html += '</tbody></table>';
@@ -422,18 +426,31 @@ function renderPlan(settings, options = {}) {
   if (!planReplaceBound) {
     planContent.addEventListener('change', (e)=>{
       const t = e.target;
-      if (!(t && t.tagName === 'SELECT')) return;
-      if (!t.classList.contains('replace-select')) return;
-      const key = t.getAttribute('data-key');
-      const val = t.value;
-      const map = loadExerciseMap();
-      if (key) map[key] = val; else return;
-      saveExerciseMap(map);
-      // Re-render to reflect machine and names
-  const raw = localStorage.getItem(SETTINGS_KEY);
-  const settings = raw ? JSON.parse(raw) : {};
-  const openWeeks = getOpenWeeksSet();
-  renderPlan(settings, { openWeeks });
+      if (!t) return;
+      if (t.tagName === 'SELECT' && t.classList.contains('replace-select')){
+        const key = t.getAttribute('data-key');
+        const val = t.value;
+        const map = loadExerciseMap();
+        if (key) map[key] = val; else return;
+        saveExerciseMap(map);
+        // Re-render to reflect machine and names, preserve open weeks
+        const raw = localStorage.getItem(SETTINGS_KEY);
+        const settings = raw ? JSON.parse(raw) : {};
+        const openWeeks = getOpenWeeksSet();
+        renderPlan(settings, { openWeeks });
+        return;
+      }
+      if (t instanceof HTMLInputElement && t.type === 'checkbox' && t.classList.contains('done-check')){
+        const w = t.getAttribute('data-week');
+        const d = t.getAttribute('data-day');
+        const x = t.getAttribute('data-ex');
+        if (!w || !d || !x) return;
+        const k = `${PLAN_DONE_PREFIX}${w}_${d}_${x}`;
+        localStorage.setItem(k, t.checked ? '1' : '0');
+        const tr = t.closest('tr');
+        if (tr) tr.classList.toggle('row-done', t.checked);
+        return;
+      }
     });
     planReplaceBound = true;
   }
