@@ -151,6 +151,18 @@ function getOpenWeeksSet(){
   return set;
 }
 
+// Preserve open days (per week) across re-render
+function getOpenDaysSet(){
+  const set = new Set();
+  planContent.querySelectorAll('details[data-week] details[open][data-day]').forEach(d=>{
+    const week = d.closest('details[data-week]');
+    const w = week ? parseInt(week.getAttribute('data-week')||'') : NaN;
+    const day = parseInt(d.getAttribute('data-day')||'');
+    if (!isNaN(w) && !isNaN(day)) set.add(`${w}_${day}`);
+  });
+  return set;
+}
+
 // Compute adjusted sets/reps/percent/cue based on replacement
 function computeAdjusted(exercise, selectedName){
   const key = exercise.key || exercise.name;
@@ -373,27 +385,34 @@ function renderPlan(settings, options = {}) {
     const details = document.createElement('details');
     details.dataset.week = String(week);
     details.open = !!(options.openWeeks && options.openWeeks.has(week));
-    const summary = document.createElement('summary');
-    summary.innerHTML = `<span class="summary-title">Week ${week}</span>`;
-    details.appendChild(summary);
-    const inner = document.createElement('div');
+  const summary = document.createElement('summary');
+  summary.innerHTML = `<span class="summary-title">Week ${week}</span>`;
+  details.appendChild(summary);
+  const inner = document.createElement('div');
     inner.className = 'details-inner';
-    let html = '<table><thead><tr><th>Day</th><th>Exercise</th><th>Machine</th><th>Sets × Reps</th><th>Load / Cue</th><th>Replace</th><th>Done</th></tr></thead><tbody>';
+    // Nested day accordions
     days.forEach((day, dayIndex) => {
+      const dDetails = document.createElement('details');
+      dDetails.dataset.day = String(dayIndex+1);
+      const openDays = options.openDays;
+      dDetails.open = !!(openDays && openDays.has(`${week}_${dayIndex+1}`));
+      const dSummary = document.createElement('summary');
+      dSummary.innerHTML = `<span class="summary-title">${day.name}</span>`;
+      dDetails.appendChild(dSummary);
+      // Build table for this day only
+      let html = '<table><thead><tr><th>Exercise</th><th>Machine</th><th>Sets × Reps</th><th>Load / Cue</th><th>Replace</th><th>Done</th></tr></thead><tbody>';
       day.exercises.forEach((exercise, exIdx) => {
         // Auto-pick best exercise based on availability if user hasn't overridden
         const map = loadExerciseMap();
         const eKey = exercise.key || exercise.name;
         let currentName = map[eKey];
         if (!currentName) {
-          const opts = REPLACEMENTS[eKey] || [{ name: exercise.name, machine: getMachineForName(exercise.name, eKey) }];
-          const preferred = opts.find(o=> availSet.has(o.machine)) || opts[0];
+          const replOpts = REPLACEMENTS[eKey] || [{ name: exercise.name, machine: getMachineForName(exercise.name, eKey) }];
+          const preferred = replOpts.find(o=> availSet.has(o.machine)) || replOpts[0];
           currentName = preferred.name;
         }
         const machine = getMachineForName(currentName, eKey);
-        const dayNameCell = exIdx === 0 ? `<td rowspan="${day.exercises.length}">${day.name}</td>` : '';
         const { sets, reps, percent, cue } = computeAdjusted(exercise, currentName);
-        // Determine load cell after adjustment
         let loadCell = '';
         if (cue) {
           loadCell = cue;
@@ -404,21 +423,24 @@ function renderPlan(settings, options = {}) {
         } else {
           loadCell = isMachine ? 'Bodyweight / RIR 2-3' : 'As needed';
         }
-        // Build replace select options
-        const opts = (REPLACEMENTS[exercise.key] || [{ name: exercise.name, machine: machine }]).map(o=>{
+        const optsHtml = (REPLACEMENTS[exercise.key] || [{ name: exercise.name, machine: machine }]).map(o=>{
           const sel = o.name === currentName ? 'selected' : '';
           const disabled = availSet.size>0 && !availSet.has(o.machine) ? 'disabled' : '';
           return `<option value="${o.name}" ${sel} ${disabled}>${o.name}</option>`;
         }).join('');
-  const selectHtml = `<select class=\"replace-select\" data-key=\"${exercise.key || exercise.name}\">${opts}</select>`;
-  const doneKey = `${PLAN_DONE_PREFIX}${week}_${dayIndex+1}_${exIdx}`;
-  const isDone = localStorage.getItem(doneKey) === '1';
-  const doneHtml = `<input type=\"checkbox\" class=\"done-check\" data-week=\"${week}\" data-day=\"${dayIndex+1}\" data-ex=\"${exIdx}\" ${isDone?'checked':''}>`;
-  html += `<tr>${dayNameCell}<td>${currentName}</td><td>${machine}</td><td>${sets} × ${reps}</td><td>${loadCell}</td><td>${selectHtml}</td><td style=\"text-align:center;\">${doneHtml}</td></tr>`;
+        const selectHtml = `<select class="replace-select" data-key="${exercise.key || exercise.name}">${optsHtml}</select>`;
+        const doneKey = `${PLAN_DONE_PREFIX}${week}_${dayIndex+1}_${exIdx}`;
+        const isDone = localStorage.getItem(doneKey) === '1';
+        const doneHtml = `<input type="checkbox" class="done-check" data-week="${week}" data-day="${dayIndex+1}" data-ex="${exIdx}" ${isDone?'checked':''}>`;
+        html += `<tr${isDone?' class="row-done"':''}><td>${currentName}</td><td>${machine}</td><td>${sets} × ${reps}</td><td>${loadCell}</td><td>${selectHtml}</td><td style="text-align:center;">${doneHtml}</td></tr>`;
       });
+      html += '</tbody></table>';
+      const wrap = document.createElement('div');
+      wrap.className = 'table-scroll';
+      wrap.innerHTML = html;
+      dDetails.appendChild(wrap);
+      inner.appendChild(dDetails);
     });
-    html += '</tbody></table>';
-    inner.innerHTML = html;
     details.appendChild(inner);
     planContent.appendChild(details);
   }
@@ -437,7 +459,8 @@ function renderPlan(settings, options = {}) {
         const raw = localStorage.getItem(SETTINGS_KEY);
         const settings = raw ? JSON.parse(raw) : {};
         const openWeeks = getOpenWeeksSet();
-        renderPlan(settings, { openWeeks });
+        const openDays = getOpenDaysSet();
+        renderPlan(settings, { openWeeks, openDays });
         return;
       }
       if (t instanceof HTMLInputElement && t.type === 'checkbox' && t.classList.contains('done-check')){
@@ -450,6 +473,24 @@ function renderPlan(settings, options = {}) {
         const tr = t.closest('tr');
         if (tr) tr.classList.toggle('row-done', t.checked);
         return;
+      }
+    });
+    // Accordion behavior for days: keep only one open per week
+    planContent.addEventListener('toggle', (e)=>{
+      const target = e.target;
+      if (!(target instanceof HTMLElement)) return;
+      // When a week opens, auto-open the first day if none is open
+      if (target.matches('details[data-week]') && target.open){
+        const dayDetails = target.querySelectorAll('details[data-day]');
+        if (dayDetails.length){
+          const anyOpen = Array.from(dayDetails).some(d=>d.open);
+          if (!anyOpen) dayDetails[0].open = true;
+        }
+      }
+      if (target.matches('details[data-day]') && target.open){
+        const weekEl = target.closest('details[data-week]');
+        if (!weekEl) return;
+        weekEl.querySelectorAll('details[data-day]').forEach(d => { if (d !== target) d.open = false; });
       }
     });
     planReplaceBound = true;
@@ -812,8 +853,9 @@ if (equipContainer) equipContainer.addEventListener('change', ()=>{
   const raw = localStorage.getItem(SETTINGS_KEY);
   const settings = raw ? JSON.parse(raw) : {};
   const openWeeks = getOpenWeeksSet();
+  const openDays = getOpenDaysSet();
   const toolsState = getOpenTools();
-  renderPlan(settings, { openWeeks });
+  renderPlan(settings, { openWeeks, openDays });
   // restore tools open drawers
   restoreOpenTools(toolsState);
 });
@@ -828,7 +870,12 @@ if (weekRange){
     renderLog(settings);
   });
 }
-if (btnExpandWeeks) btnExpandWeeks.addEventListener('click', ()=> setAllDetailsOpen(planContent, true));
-if (btnCollapseWeeks) btnCollapseWeeks.addEventListener('click', ()=> setAllDetailsOpen(planContent, false));
+// Only toggle week-level accordions for Plan expand/collapse
+if (btnExpandWeeks) btnExpandWeeks.addEventListener('click', ()=>{
+  planContent.querySelectorAll('details[data-week]').forEach(d=> d.open = true);
+});
+if (btnCollapseWeeks) btnCollapseWeeks.addEventListener('click', ()=>{
+  planContent.querySelectorAll('details[data-week]').forEach(d=> d.open = false);
+});
 if (btnExpandLogWeeks) btnExpandLogWeeks.addEventListener('click', ()=> setAllDetailsOpen(logContent, true));
 if (btnCollapseLogWeeks) btnCollapseLogWeeks.addEventListener('click', ()=> setAllDetailsOpen(logContent, false));

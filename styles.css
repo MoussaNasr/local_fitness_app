@@ -108,8 +108,11 @@ tbody tr:hover { background: color-mix(in srgb, var(--panel-2) 60%, transparent)
 .tag { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; border: 1px solid var(--border); color: var(--muted); }
 
 /* Scrollable tables for mobile */
-.table-scroll { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.table-scroll { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; }
 .table-scroll table { min-width: 700px; }
+@media (max-width: 640px) {
+  .table-scroll { padding-bottom: 6px; }
+}
 
 /* Details/summary */
 details { border: 1px solid var(--border); border-radius: 12px; margin: 10px 0; overflow: hidden; background: var(--panel); }
