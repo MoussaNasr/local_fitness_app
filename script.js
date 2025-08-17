@@ -773,12 +773,32 @@ initImportExport();
 renderProgressChart();
 renderEquipmentUI();
 
-// Re-render plan when equipment changes; preserve open week toggles
-if (equipmentList) equipmentList.addEventListener('change', ()=>{
+// Re-render plan when equipment changes; preserve open states
+function getOpenTools(){
+  const ids = ['tools1rm','toolsPlates','toolsTimer'];
+  const state = {};
+  ids.forEach(id=>{
+    const el = document.getElementById(id);
+    if (el) state[id] = el.open;
+  });
+  return state;
+}
+function restoreOpenTools(state){
+  Object.entries(state||{}).forEach(([id, open])=>{
+    const el = document.getElementById(id);
+    if (el) el.open = !!open;
+  });
+}
+// Listen at the container so select-all/clear also trigger this
+const equipContainer = document.getElementById('availableEquipmentDetails');
+if (equipContainer) equipContainer.addEventListener('change', ()=>{
   const raw = localStorage.getItem(SETTINGS_KEY);
   const settings = raw ? JSON.parse(raw) : {};
   const openWeeks = getOpenWeeksSet();
+  const toolsState = getOpenTools();
   renderPlan(settings, { openWeeks });
+  // restore tools open drawers
+  restoreOpenTools(toolsState);
 });
 
 // Week range and expand/collapse controls
