@@ -91,33 +91,6 @@ const REPLACEMENTS = {
   { name: 'Bulgarian Split Squat', machine: 'Dumbbells' },
   { name: 'Walking Lunges', machine: 'Dumbbells', adjust: { reps: 10 } },
   ],
-  K_PLYO: [
-    { name: 'Box/Vertical Jumps', machine: 'Plyo Box / Space' },
-    { name: 'Jump Rope', machine: 'Rope' },
-  ],
-  K_UPPER_PRESS: [
-  { name: 'Chest Press', machine: 'Chest Press Machine', adjust: { percentDelta: -0.05 } },
-  { name: 'Bench Press', machine: 'Bench + Barbell' },
-  { name: 'Dumbbell Bench Press', machine: 'Bench + Dumbbells', adjust: { percentDelta: -0.1, reps: 8 } },
-  { name: 'Push-Ups', machine: 'Bodyweight', adjust: { reps: 12, cue: 'Bodyweight / RIR 2-3' } },
-  ],
-  K_SHOULDER_PRESS: [
-  { name: 'Overhead Press', machine: 'Barbell' },
-  { name: 'Dumbbell Shoulder Press', machine: 'Dumbbells', adjust: { reps: 8 } },
-  { name: 'Pike Push-Ups', machine: 'Bodyweight', adjust: { reps: 10, cue: 'Bodyweight / RIR 2-3' } },
-  { name: 'Machine Shoulder Press', machine: 'Shoulder Press Machine', adjust: { percentDelta: -0.05, reps: 8 } },
-  ],
-  K_ROW: [
-    { name: 'Bodyweight Rows', machine: 'Smith Machine / Bar' },
-    { name: 'Barbell Row', machine: 'Barbell' },
-    { name: 'Dumbbell Row', machine: 'Bench + Dumbbells' },
-  { name: 'Cable Row', machine: 'Cable Row Machine', adjust: { reps: 10 } },
-  ],
-  K_CARRIES: [
-    { name: 'Loaded Carries', machine: 'Farmer Handles / Dumbbells' },
-    { name: 'Suitcase Carry', machine: 'Dumbbells' },
-    { name: 'Trap Bar Carry', machine: 'Trap Bar' },
-  ],
   K_STRIKE: [
     { name: 'Shadow Boxing / Bag Rounds', machine: 'Heavy Bag / Open Space' },
     { name: 'Assault Bike Intervals', machine: 'Air Bike' },
@@ -140,6 +113,66 @@ const REPLACEMENTS = {
     { name: 'Leg Extension', machine: 'Leg Extension Machine', adjust: { reps: 12 } },
   ],
 };
+
+const EXERCISE_IMAGES = {
+  'Back Squat (Barbell)': ['https://upload.wikimedia.org/wikipedia/commons/thumb/7/76/Squat_-_weight_training_exercise.gif/640px-Squat_-_weight_training_exercise.gif'],
+  'Leg Press': ['https://upload.wikimedia.org/wikipedia/commons/thumb/0/0c/Leg_press_machine.jpg/640px-Leg_press_machine.jpg'],
+  'Hack Squat': ['https://upload.wikimedia.org/wikipedia/commons/thumb/1/1e/Hack_Squat.jpg/640px-Hack_Squat.jpg'],
+  'Goblet Squat (DB)': ['https://upload.wikimedia.org/wikipedia/commons/thumb/3/33/Goblet_Squat.png/480px-Goblet_Squat.png'],
+  'Bench Press': ['https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/Bench_Press.png/640px-Bench_Press.png'],
+  'Chest Press': ['https://upload.wikimedia.org/wikipedia/commons/thumb/5/5c/Chest_press_machine.jpg/640px-Chest_press_machine.jpg'],
+  'Dumbbell Bench Press': ['https://upload.wikimedia.org/wikipedia/commons/thumb/5/5a/Dumbbell-bench-press-2.png/640px-Dumbbell-bench-press-2.png'],
+  'Push-Ups': ['https://upload.wikimedia.org/wikipedia/commons/thumb/5/53/Pushup.jpg/640px-Pushup.jpg'],
+  'Overhead Press': ['https://upload.wikimedia.org/wikipedia/commons/thumb/7/7e/Shoulder_press2.svg/512px-Shoulder_press2.svg.png'],
+  'Dumbbell Shoulder Press': ['https://upload.wikimedia.org/wikipedia/commons/1/1f/Dumbbell_shoulder_press.png'],
+  'Pike Push-Ups': ['https://upload.wikimedia.org/wikipedia/commons/thumb/5/53/Pushup.jpg/640px-Pushup.jpg'],
+  'Machine Shoulder Press': ['https://upload.wikimedia.org/wikipedia/commons/thumb/5/57/Shoulder_press_machine.jpg/640px-Shoulder_press_machine.jpg'],
+  'Bodyweight Rows': ['https://upload.wikimedia.org/wikipedia/commons/thumb/b/b4/Australian_Pull-Up.svg/512px-Australian_Pull-Up.svg.png'],
+  'Barbell Row': ['https://upload.wikimedia.org/wikipedia/commons/thumb/c/c8/Barbell_Bent-Over_Row.svg/512px-Barbell_Bent-Over_Row.svg.png'],
+  'Dumbbell Row': ['https://upload.wikimedia.org/wikipedia/commons/thumb/1/16/One-Arm_Dumbbell_Row.svg/512px-One-Arm_Dumbbell_Row.svg.png'],
+  'Cable Row': ['https://upload.wikimedia.org/wikipedia/commons/thumb/2/2e/Seated_cable_rows.jpg/640px-Seated_cable_rows.jpg'],
+  'Loaded Carries': ['https://upload.wikimedia.org/wikipedia/commons/thumb/7/79/Farmer%27s_walk.gif/480px-Farmer%27s_walk.gif'],
+  'Suitcase Carry': ['https://upload.wikimedia.org/wikipedia/commons/thumb/7/79/Farmer%27s_walk.gif/480px-Farmer%27s_walk.gif'],
+  'Trap Bar Carry': ['https://upload.wikimedia.org/wikipedia/commons/thumb/3/34/Trap_bar_deadlift.jpg/640px-Trap_bar_deadlift.jpg'],
+  'Shadow Boxing / Bag Rounds': ['https://upload.wikimedia.org/wikipedia/commons/thumb/7/7e/Punching_bag_gymsports.jpg/640px-Punching_bag_gymsports.jpg'],
+  'Assault Bike Intervals': ['https://upload.wikimedia.org/wikipedia/commons/thumb/4/47/Schwinn_Airdyne_exercise_bike.jpg/640px-Schwinn_Airdyne_exercise_bike.jpg'],
+  'Row Erg Intervals': ['https://upload.wikimedia.org/wikipedia/commons/thumb/5/51/Indoor_Rower.jpg/640px-Indoor_Rower.jpg'],
+  'Hill / Stair Sprints': ['https://upload.wikimedia.org/wikipedia/commons/thumb/4/4c/Running_up_stairs.jpg/640px-Running_up_stairs.jpg'],
+  'Treadmill Sprints': ['https://upload.wikimedia.org/wikipedia/commons/thumb/8/8e/Treadmill.jpg/640px-Treadmill.jpg'],
+  'Bike Sprints': ['https://upload.wikimedia.org/wikipedia/commons/thumb/7/7a/Exercise_bicycle.jpg/640px-Exercise_bicycle.jpg'],
+  'Deadlift': ['https://upload.wikimedia.org/wikipedia/commons/thumb/b/b5/Deadlift.svg/512px-Deadlift.svg.png'],
+  'Hip Thrust (Bodyweight)': ['https://upload.wikimedia.org/wikipedia/commons/thumb/6/6f/Hip_thrust.jpg/640px-Hip_thrust.jpg'],
+  'Hip Thrust (Barbell)': ['https://upload.wikimedia.org/wikipedia/commons/thumb/6/6f/Hip_thrust.jpg/640px-Hip_thrust.jpg'],
+  'Kettlebell Swings': ['https://upload.wikimedia.org/wikipedia/commons/thumb/9/94/Kettlebell-swing.svg/512px-Kettlebell-swing.svg.png'],
+  'Front Squat': ['https://upload.wikimedia.org/wikipedia/commons/thumb/8/8e/Front_squat.svg/512px-Front_squat.svg.png'],
+  'Rear Foot Elevated Split Squat': ['https://upload.wikimedia.org/wikipedia/commons/thumb/d/d3/Bulgarian_Split_Squat.svg/512px-Bulgarian_Split_Squat.svg.png'],
+  'Leg Extension': ['https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/Leg_extension.svg/512px-Leg_extension.svg.png'],
+  'Jump Series': ['https://upload.wikimedia.org/wikipedia/commons/thumb/2/20/Vertical_Jump.jpg/640px-Vertical_Jump.jpg'],
+  'Push-Ups / Incline Press': ['https://upload.wikimedia.org/wikipedia/commons/thumb/9/9c/Incline_bench_press_2.png/640px-Incline_bench_press_2.png'],
+  'Towel/Sheet Rows': ['https://upload.wikimedia.org/wikipedia/commons/thumb/b/b4/Australian_Pull-Up.svg/512px-Australian_Pull-Up.svg.png'],
+};
+const EX_PLACEHOLDER = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(`
+  <svg xmlns="http://www.w3.org/2000/svg" width="640" height="360">
+    <rect width="100%" height="100%" fill="#121319"/>
+    <rect x="20" y="20" width="600" height="320" rx="16" ry="16" fill="none" stroke="#3b3f53" stroke-width="2"/>
+    <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#e6e8ee" font-family="system-ui" font-size="20">No image available</text>
+  </svg>
+`);
+
+function openModal(title, html){
+  if (!modal) return;
+  if (modalTitle) modalTitle.textContent = title || '';
+  if (modalBody) modalBody.innerHTML = html || '';
+  modal.classList.add('show');
+  modal.setAttribute('aria-hidden', 'false');
+}
+function closeModal(){
+  if (!modal) return;
+  modal.classList.remove('show');
+  modal.setAttribute('aria-hidden', 'true');
+}
+if (modalClose) modalClose.addEventListener('click', closeModal);
+if (modal) modal.addEventListener('click', (e)=>{ if (e.target === modal) closeModal(); });
 
 // Preserve open weeks across re-render
 function getOpenWeeksSet(){
@@ -428,11 +461,12 @@ function renderPlan(settings, options = {}) {
           const disabled = availSet.size>0 && !availSet.has(o.machine) ? 'disabled' : '';
           return `<option value="${o.name}" ${sel} ${disabled}>${o.name}</option>`;
         }).join('');
-        const selectHtml = `<select class="replace-select" data-key="${exercise.key || exercise.name}">${optsHtml}</select>`;
+  const infoBtn = `<button class="info-btn" title="Exercise info" aria-label="Exercise info" data-exname="${currentName}">ℹ️</button>`;
+  const selectHtml = `<select class="replace-select" data-key="${exercise.key || exercise.name}">${optsHtml}</select>`;
         const doneKey = `${PLAN_DONE_PREFIX}${week}_${dayIndex+1}_${exIdx}`;
         const isDone = localStorage.getItem(doneKey) === '1';
         const doneHtml = `<input type="checkbox" class="done-check" data-week="${week}" data-day="${dayIndex+1}" data-ex="${exIdx}" ${isDone?'checked':''}>`;
-        html += `<tr${isDone?' class="row-done"':''}><td>${currentName}</td><td>${machine}</td><td>${sets} × ${reps}</td><td>${loadCell}</td><td>${selectHtml}</td><td style="text-align:center;">${doneHtml}</td></tr>`;
+  html += `<tr${isDone?' class="row-done"':''}><td>${currentName} ${infoBtn}</td><td>${machine}</td><td>${sets} × ${reps}</td><td>${loadCell}</td><td>${selectHtml}</td><td style="text-align:center;">${doneHtml}</td></tr>`;
       });
       html += '</tbody></table>';
       const wrap = document.createElement('div');
@@ -474,6 +508,17 @@ function renderPlan(settings, options = {}) {
         if (tr) tr.classList.toggle('row-done', t.checked);
         return;
       }
+    });
+    // Info button click (open images)
+    planContent.addEventListener('click', (e)=>{
+      const btn = e.target.closest && e.target.closest('button.info-btn');
+      if (!btn) return;
+      const name = btn.getAttribute('data-exname') || 'Exercise';
+      const imgs = EXERCISE_IMAGES[name] || [];
+      const content = imgs.length ?
+        `<div class="modal-row">${imgs.map(src=>`<img src="${src}" alt="${name}" style="width:100%;height:auto;border-radius:8px;border:1px solid var(--border)" onerror="this.src='${EX_PLACEHOLDER}'">`).join('')}</div>`
+        : `<img src="${EX_PLACEHOLDER}" alt="No image" style="width:100%;height:auto;border-radius:8px;border:1px solid var(--border)">`;
+      openModal(name, content);
     });
     // Accordion behavior for days: keep only one open per week
     planContent.addEventListener('toggle', (e)=>{

@@ -130,6 +130,11 @@ summary::-webkit-details-marker { display: none; }
 .close-x { position: absolute; top: 10px; right: 14px; background: transparent; border: none; color: var(--muted); font-size: 20px; cursor: pointer; }
 .modal-backdrop.show { display: flex; }
 
+/* Info button inline with exercise name */
+.info-btn { margin-left: 6px; font-size: 14px; line-height: 1; padding: 4px 6px; border-radius: 6px; border: 1px solid var(--border); background: var(--panel); color: var(--text); cursor: pointer; }
+.info-btn:hover { border-color: var(--brand); }
+@media (max-width: 520px){ .modal-row { grid-template-columns: 1fr; } }
+
 /* Timer */
 .timer { display: flex; align-items: center; gap: 8px; }
 .timer-display { font-variant-numeric: tabular-nums; font-weight: 800; padding: 6px 10px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; }
