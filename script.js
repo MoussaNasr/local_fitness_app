@@ -76,6 +76,7 @@ const THEME_KEY = 'hybridTheme';
 const EXERCISE_MAP_KEY = 'hybridExerciseReplacements';
 const EQUIPMENT_KEY = 'hybridAvailableEquipment';
 const PLAN_DONE_PREFIX = 'hybridPlanDone_';
+const CUSTOM_PROGRAM_KEY = 'hybridCustomProgram';
 let planReplaceBound = false;
 
 // Replacement catalog: per movement key, provide options with machine labels
@@ -324,6 +325,12 @@ function saveSettings() {
   renderProgressChart();
 }
 
+// Custom Program helpers
+function loadCustomProgram(){
+  try { return JSON.parse(localStorage.getItem(CUSTOM_PROGRAM_KEY) || 'null'); } catch { return null; }
+}
+function saveCustomProgram(days){ localStorage.setItem(CUSTOM_PROGRAM_KEY, JSON.stringify(days)); }
+
 /**
  * Utility to round a number to the nearest increment.
  * @param {number} value
@@ -375,8 +382,8 @@ function renderPlan(settings, options = {}) {
     }
   }
 
-  // Plan definition: 4 days repeated weekly for 12 weeks.
-  const days = [
+  // Plan definition: 4 days repeated weekly for 12 weeks (can be overridden).
+  const defaultDays = [
     {
       name: 'Day 1 – Lower Body Power',
       exercises: [
@@ -412,6 +419,8 @@ function renderPlan(settings, options = {}) {
       ],
     },
   ];
+  const custom = loadCustomProgram();
+  const days = Array.isArray(custom) && custom.length ? custom : defaultDays;
 
   for (let week = 1; week <= 12; week++) {
     if (!inSelectedRange(week)) continue;
@@ -432,8 +441,8 @@ function renderPlan(settings, options = {}) {
       const dSummary = document.createElement('summary');
       dSummary.innerHTML = `<span class="summary-title">${day.name}</span>`;
       dDetails.appendChild(dSummary);
-      // Build table for this day only
-      let html = '<table><thead><tr><th>Exercise</th><th>Machine</th><th>Sets × Reps</th><th>Load / Cue</th><th>Replace</th><th>Done</th></tr></thead><tbody>';
+  // Build table for this day only
+  let html = '<table><thead><tr><th>Exercise</th><th>Machine</th><th>Sets × Reps</th><th>Load / Cue</th><th>Replace</th><th>Done</th></tr></thead><tbody>';
       day.exercises.forEach((exercise, exIdx) => {
         // Auto-pick best exercise based on availability if user hasn't overridden
         const map = loadExerciseMap();
@@ -469,6 +478,17 @@ function renderPlan(settings, options = {}) {
   html += `<tr${isDone?' class="row-done"':''}><td>${currentName} ${infoBtn}</td><td>${machine}</td><td>${sets} × ${reps}</td><td>${loadCell}</td><td>${selectHtml}</td><td style="text-align:center;">${doneHtml}</td></tr>`;
       });
       html += '</tbody></table>';
+      // Recovery details per day
+      const rec = getRecoveryForDay(day.name);
+      if (rec) {
+        html += `<div class="hint" style="margin-top:10px">Recovery: ${rec.summary}</div>`;
+        if (rec.stretches && rec.stretches.length){
+          html += '<ul class="hint">' + rec.stretches.map(s=>`<li>${s.name}: ${s.duration}</li>`).join('') + '</ul>';
+        }
+        if (rec.massage && rec.massage.length){
+          html += '<div class="hint">Massage gun: ' + rec.massage.map(m=>`${m.area} (${m.duration})`).join(', ') + '</div>';
+        }
+      }
       const wrap = document.createElement('div');
       wrap.className = 'table-scroll';
       wrap.innerHTML = html;
@@ -540,6 +560,68 @@ function renderPlan(settings, options = {}) {
     });
     planReplaceBound = true;
   }
+}
+
+// Simple recovery generator by day type keywords
+function getRecoveryForDay(dayName){
+  const n = (dayName||'').toLowerCase();
+  // Defaults
+  const base = {
+    summary: '5–10 min light cardio cool‑down, then targeted stretches and optional massage gun.',
+    stretches: [],
+    massage: []
+  };
+  if (n.includes('lower')){
+    base.stretches = [
+      { name: 'Hamstring stretch', duration: '2×30s/side' },
+      { name: 'Hip flexor lunge', duration: '2×30s/side' },
+      { name: 'Calf stretch (wall)', duration: '2×30s/side' }
+    ];
+    base.massage = [
+      { area: 'Quads', duration: '60–90s/leg' },
+      { area: 'Glutes', duration: '60s/side' },
+      { area: 'Calves', duration: '60s/side' }
+    ];
+  } else if (n.includes('upper')){
+    base.stretches = [
+      { name: 'Doorway chest stretch', duration: '2×30s' },
+      { name: 'Lat stretch (overhead)', duration: '2×30s/side' },
+      { name: 'Sleeper stretch', duration: '2×30s/side' }
+    ];
+    base.massage = [
+      { area: 'Pecs', duration: '45–60s/side' },
+      { area: 'Lats', duration: '60s/side' },
+      { area: 'Rear delts', duration: '45s/side' }
+    ];
+  } else if (n.includes('explosive') || n.includes('conditioning') || n.includes('sprint') || n.includes('strike')){
+    base.stretches = [
+      { name: 'Hip flexor lunge', duration: '2×30s/side' },
+      { name: 'T‑spine openers', duration: '2×30s/side' },
+      { name: 'Ankle dorsiflexion wall drill', duration: '2×30s/side' }
+    ];
+    base.massage = [
+      { area: 'Calves', duration: '60s/side' },
+      { area: 'Hip flexors', duration: '45s/side' }
+    ];
+  } else if (n.includes('mixed') || n.includes('stability')){
+    base.stretches = [
+      { name: 'Cat‑cow (spine)', duration: '1–2 min' },
+      { name: 'Figure‑4 glute stretch', duration: '2×30s/side' },
+      { name: 'Child’s pose + side reach', duration: '1–2 min' }
+    ];
+    base.massage = [
+      { area: 'Glutes', duration: '60s/side' },
+      { area: 'Mid‑back (erectors)', duration: '60–90s' }
+    ];
+  } else {
+    // Generic
+    base.stretches = [
+      { name: 'Hamstrings', duration: '2×30s' },
+      { name: 'Chest', duration: '2×30s' },
+      { name: 'Hips', duration: '2×30s' }
+    ];
+  }
+  return base;
 }
 
 /**
@@ -875,6 +957,46 @@ initTimer();
 initImportExport();
 renderProgressChart();
 renderEquipmentUI();
+
+// Custom Program UI wiring
+const customProgramText = document.getElementById('customProgramJson');
+const customProgramStatus = document.getElementById('customProgramStatus');
+const btnSaveCustomProgram = document.getElementById('btnSaveCustomProgram');
+const btnClearCustomProgram = document.getElementById('btnClearCustomProgram');
+if (customProgramText){
+  // Load existing
+  const existing = loadCustomProgram();
+  if (existing) customProgramText.value = JSON.stringify(existing, null, 2);
+}
+if (btnSaveCustomProgram){
+  btnSaveCustomProgram.addEventListener('click', ()=>{
+    try {
+      const parsed = JSON.parse(customProgramText.value || '');
+      if (!Array.isArray(parsed) || !parsed.length) throw new Error('Invalid program format');
+      saveCustomProgram(parsed);
+      customProgramStatus.textContent = 'Custom program saved. Plan updated.';
+      const raw = localStorage.getItem(SETTINGS_KEY);
+      const settings = raw ? JSON.parse(raw) : {};
+      const openWeeks = getOpenWeeksSet();
+      const openDays = getOpenDaysSet();
+      renderPlan(settings, { openWeeks, openDays });
+    } catch (e){
+      customProgramStatus.textContent = 'Failed to parse JSON.';
+    }
+  });
+}
+if (btnClearCustomProgram){
+  btnClearCustomProgram.addEventListener('click', ()=>{
+    localStorage.removeItem(CUSTOM_PROGRAM_KEY);
+    if (customProgramText) customProgramText.value = '';
+    customProgramStatus.textContent = 'Reverted to default program.';
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    const settings = raw ? JSON.parse(raw) : {};
+    const openWeeks = getOpenWeeksSet();
+    const openDays = getOpenDaysSet();
+    renderPlan(settings, { openWeeks, openDays });
+  });
+}
 
 // Re-render plan when equipment changes; preserve open states
 function getOpenTools(){
