@@ -11,6 +11,20 @@
 const navSetup = document.getElementById('navSetup');
 const navPlan = document.getElementById('navPlan');
 const navLog = document.getElementById('navLog');
+// Session section elements
+const sessionSection = document.getElementById('session');
+const sessionTitle = document.getElementById('sessionTitle');
+const sessionSubtitle = document.getElementById('sessionSubtitle');
+const sessionExercisesTable = document.getElementById('sessionExercisesTable');
+const sessionWarmup = document.getElementById('sessionWarmup');
+const sessionRecovery = document.getElementById('sessionRecovery');
+const sessionBack = document.getElementById('sessionBack');
+const sessionSaveEnd = document.getElementById('sessionSaveEnd');
+const sessionTimerMinutes = document.getElementById('sessionTimerMinutes');
+const sessionTimerDisplay = document.getElementById('sessionTimerDisplay');
+const sessionTimerStart = document.getElementById('sessionTimerStart');
+const sessionTimerStop = document.getElementById('sessionTimerStop');
+const sessionTimerReset = document.getElementById('sessionTimerReset');
 
 // Select sections
 const setupSection = document.getElementById('setup');
@@ -36,13 +50,15 @@ const importFile = document.getElementById('importFile');
 
 // Containers for plan and log
 const planContent = document.getElementById('planContent');
-const logContent = document.getElementById('logContent');
 const progressCanvas = document.getElementById('progressChart');
+const volumeCanvas = document.getElementById('volumeChart');
+const statDays = document.getElementById('statDays');
+const statVolume = document.getElementById('statVolume');
+const statAvg = document.getElementById('statAvg');
 const weekRange = document.getElementById('weekRange');
 const btnExpandWeeks = document.getElementById('btnExpandWeeks');
 const btnCollapseWeeks = document.getElementById('btnCollapseWeeks');
-const btnExpandLogWeeks = document.getElementById('btnExpandLogWeeks');
-const btnCollapseLogWeeks = document.getElementById('btnCollapseLogWeeks');
+// removed log page expand/collapse controls
 
 // Tools elements
 const calcReps = document.getElementById('calcReps');
@@ -274,6 +290,7 @@ function showSection(section) {
   setupSection.classList.add('hidden');
   planSection.classList.add('hidden');
   logSection.classList.add('hidden');
+  if (sessionSection) sessionSection.classList.add('hidden');
   switch (section) {
     case 'setup':
       setupSection.classList.remove('hidden');
@@ -286,6 +303,14 @@ function showSection(section) {
     case 'log':
       logSection.classList.remove('hidden');
       navLog.classList.add('active');
+      // Render analytics when entering stats page
+      renderProgressChart();
+      renderVolumeChart();
+      renderStatsSummary();
+      break;
+    case 'session':
+      if (sessionSection) sessionSection.classList.remove('hidden');
+      // Do not set any nav tab active for session
       break;
   }
 }
@@ -321,7 +346,6 @@ function saveSettings() {
   setupStatus.textContent = 'Settings saved!';
   // Refresh plan and log
   renderPlan(settings);
-  renderLog(settings);
   renderProgressChart();
 }
 
@@ -438,9 +462,14 @@ function renderPlan(settings, options = {}) {
       dDetails.dataset.day = String(dayIndex+1);
       const openDays = options.openDays;
       dDetails.open = !!(openDays && openDays.has(`${week}_${dayIndex+1}`));
-      const dSummary = document.createElement('summary');
+  const dSummary = document.createElement('summary');
       dSummary.innerHTML = `<span class="summary-title">${day.name}</span>`;
       dDetails.appendChild(dSummary);
+  // Controls for this day
+  const controlsBar = document.createElement('div');
+  controlsBar.style = 'display:flex; justify-content:flex-end; gap:8px; margin:6px 0;';
+  controlsBar.innerHTML = `<button class="btn btn-start-session" data-week="${week}" data-day="${dayIndex+1}">Start Session</button>`;
+  dDetails.appendChild(controlsBar);
   // Build table for this day only
   let html = '<table><thead><tr><th>Exercise</th><th>Machine</th><th>Sets × Reps</th><th>Load / Cue</th><th>Replace</th><th>Done</th></tr></thead><tbody>';
       day.exercises.forEach((exercise, exIdx) => {
@@ -529,6 +558,18 @@ function renderPlan(settings, options = {}) {
         return;
       }
     });
+    // Start Session button
+    planContent.addEventListener('click', (e)=>{
+      const btn = e.target.closest && e.target.closest('.btn-start-session');
+      if (!btn) return;
+      const w = parseInt(btn.getAttribute('data-week')||'');
+      const d = parseInt(btn.getAttribute('data-day')||'');
+      if (!w || !d) return;
+      const raw = localStorage.getItem(SETTINGS_KEY);
+      const settings = raw ? JSON.parse(raw) : {};
+      renderSession(settings, w, d);
+      showSection('session');
+    });
     // Info button click (open images)
     planContent.addEventListener('click', (e)=>{
       const btn = e.target.closest && e.target.closest('button.info-btn');
@@ -560,6 +601,246 @@ function renderPlan(settings, options = {}) {
     });
     planReplaceBound = true;
   }
+}
+
+// ------------------------------
+// Session Page Logic
+// ------------------------------
+let currentSession = null; // { week, day, name, exercises:[{name,machine,sets,reps,load,cue,done:Array<bool>}]} 
+
+function getPlanDaysForSettings(settings){
+  // Reuse same logic as in renderPlan to build days array
+  const isMachine = settings.mode === 'machine';
+  const defaultDays = [
+    {
+      name: 'Day 1 – Lower Body Power',
+      exercises: [
+        { key: 'K_LOWER_PRIMARY', name: isMachine ? 'Leg Press' : 'Back Squat (Barbell)', sets: 5, reps: 5, percent: 0.85, primary: 'leg' },
+        { key: 'K_LOWER_UNILATERAL', name: isMachine ? 'Single-Leg Leg Press' : 'Bulgarian Split Squat', sets: 3, reps: 8, percent: 0.75, primary: 'leg' },
+        { key: 'K_PLYO', name: 'Box/Vertical Jumps', sets: 4, reps: 6, percent: 0.50, primary: null },
+      ],
+    },
+    {
+      name: 'Day 2 – Upper Push & Pull',
+      exercises: [
+        { key: 'K_UPPER_PRESS', name: isMachine ? 'Chest Press' : 'Bench Press', sets: 5, reps: 5, percent: 0.85, primary: 'chest' },
+        { key: 'K_SHOULDER_PRESS', name: isMachine ? 'Pike Push-Ups' : 'Overhead Press', sets: 3, reps: 8, percent: 0.75, primary: 'chest' },
+        { key: 'K_ROW', name: 'Bodyweight Rows', sets: 4, reps: 8, percent: 0.50, primary: null },
+        { key: 'K_CARRIES', name: 'Loaded Carries', sets: 4, reps: 1, percent: 0.60, primary: null },
+      ],
+    },
+    {
+      name: 'Day 3 – Explosive & Conditioning',
+      exercises: [
+        { key: 'K_PLYO', name: 'Jump Series', sets: 5, reps: 3, percent: 0.50, primary: null },
+        { key: 'K_STRIKE', name: 'Shadow Boxing / Bag Rounds', sets: 6, reps: 2, percent: 0.50, primary: null },
+        { key: 'K_SPRINT', name: 'Hill / Stair Sprints', sets: 8, reps: 1, percent: 0.50, primary: null },
+      ],
+    },
+    {
+      name: 'Day 4 – Mixed Strength & Stability',
+      exercises: [
+        { key: 'K_HINGE', name: isMachine ? 'Hip Thrust (Bodyweight)' : 'Deadlift', sets: 4, reps: 6, percent: 0.80, primary: 'leg' },
+        { key: 'K_LOWER_SECONDARY', name: isMachine ? 'Rear Foot Elevated Split Squat' : 'Front Squat', sets: 4, reps: 8, percent: 0.75, primary: 'leg' },
+        { key: 'K_UPPER_PRESS', name: 'Push-Ups / Incline Press', sets: 3, reps: 10, percent: 0.70, primary: 'chest' },
+        { key: 'K_ROW', name: 'Towel/Sheet Rows', sets: 4, reps: 8, percent: 0.50, primary: null },
+      ],
+    },
+  ];
+  const custom = loadCustomProgram();
+  return Array.isArray(custom) && custom.length ? custom : defaultDays;
+}
+
+function renderSession(settings, week, day){
+  if (!sessionSection) return;
+  const days = getPlanDaysForSettings(settings);
+  const dayIdx = Math.max(1, Math.min(day, days.length));
+  const dayObj = days[dayIdx-1];
+  const availSet = new Set(loadEquipment());
+  const legTM = settings.legPress1rm * 0.9;
+  const chestTM = settings.chestPress1rm * 0.9;
+  const isMachine = settings.mode === 'machine';
+
+  // Build exercises with current replacements and loads
+  const map = loadExerciseMap();
+  const exercises = dayObj.exercises.map(ex => {
+    const eKey = ex.key || ex.name;
+    let currentName = map[eKey];
+    if (!currentName){
+      const replOpts = REPLACEMENTS[eKey] || [{ name: ex.name, machine: getMachineForName(ex.name, eKey) }];
+      const preferred = replOpts.find(o=> availSet.has(o.machine)) || replOpts[0];
+      currentName = preferred.name;
+    }
+    const machine = getMachineForName(currentName, eKey);
+    const { sets, reps, percent, cue } = computeAdjusted(ex, currentName);
+  let loadCell = '';
+  let loadNumericKg = 0;
+    if (cue) loadCell = cue; else if (ex.primary === 'leg') loadCell = formatLoadLabel(isMachine, settings, legTM, percent != null ? percent : ex.percent);
+    else if (ex.primary === 'chest') loadCell = formatLoadLabel(isMachine, settings, chestTM, percent != null ? percent : ex.percent);
+    else loadCell = isMachine ? 'Bodyweight / RIR 2-3' : 'As needed';
+  // numeric estimate (kg) when load label is in kg/lb
+  loadNumericKg = parseLoadToKg(loadCell);
+  return { key: eKey, name: currentName, machine, sets, reps, load: loadCell, loadKg: loadNumericKg, done: Array.from({length: sets}, ()=>false) };
+  });
+
+  currentSession = { week, day: dayIdx, name: dayObj.name, exercises };
+
+  if (sessionTitle) sessionTitle.textContent = `Session – Week ${week}, Day ${dayIdx}`;
+  if (sessionSubtitle) sessionSubtitle.textContent = dayObj.name;
+
+  // Warmup suggestions
+  if (sessionWarmup){
+    const wu = getWarmupForDay(dayObj.name);
+    sessionWarmup.innerHTML = wu.map(w=>`<div>• ${w}</div>`).join('');
+  }
+  // Recovery
+  if (sessionRecovery){
+    const rec = getRecoveryForDay(dayObj.name);
+    let html = `<div class="hint">${rec.summary}</div>`;
+    if (rec.stretches?.length) html += '<ul class="hint">' + rec.stretches.map(s=>`<li>${s.name}: ${s.duration}</li>`).join('') + '</ul>';
+    if (rec.massage?.length) html += '<div class="hint">Massage gun: ' + rec.massage.map(m=>`${m.area} (${m.duration})`).join(', ') + '</div>';
+    sessionRecovery.innerHTML = html;
+  }
+  // Exercises table
+  if (sessionExercisesTable){
+    let html = '<thead><tr><th>Exercise</th><th>Prescribed</th><th>Load / Cue</th><th>Sets Tracker</th></tr></thead><tbody>';
+    exercises.forEach((ex, i)=>{
+      const setsBoxes = ex.done.map((v, sIdx)=>`<label style="margin-right:6px;white-space:nowrap;"><input type="checkbox" class="set-box" data-ex="${i}" data-set="${sIdx}"> S${sIdx+1}</label>`).join('');
+      html += `<tr><td>${ex.name}</td><td>${ex.sets} × ${ex.reps}</td><td>${ex.load}</td><td>${setsBoxes}</td></tr>`;
+    });
+    html += '</tbody>';
+    sessionExercisesTable.innerHTML = html;
+  }
+}
+
+function formatLoadLabel(isMachine, settings, tm, percent){
+  if (isMachine) {
+    const rir = percent >= 0.85 ? 1 : percent >= 0.75 ? 2 : 3;
+    return `RIR ${rir}`;
+  }
+  let weight = tm * percent;
+  if (settings.units === 'lb') {
+    weight = roundToIncrement(weight * 2.20462, 5);
+    return `${weight.toFixed(0)} lb`;
+  } else {
+    weight = roundToIncrement(weight, 2.5);
+    return `${weight.toFixed(1)} kg`;
+  }
+}
+
+function getWarmupForDay(dayName){
+  const n = (dayName||'').toLowerCase();
+  if (n.includes('lower')) return [
+    '5 min light bike/row',
+    'Leg swings front/back ×10/side',
+    'Hip circles ×10/side',
+    'Bodyweight squats ×10',
+  ];
+  if (n.includes('upper')) return [
+    '5 min light row/arm bike',
+    'Band pull‑aparts ×20',
+    'Scap push‑ups ×10',
+    'Wall slides ×10',
+  ];
+  if (n.includes('explosive') || n.includes('conditioning')) return [
+    '5 min jog or jump rope',
+    'Ankle hops ×20',
+    'A‑skips ×20m',
+    'Hip flexor openers ×10/side',
+  ];
+  return [
+    '5 min easy cardio',
+    'Dynamic full‑body flow 2–3 min',
+  ];
+}
+
+// Session timer (independent from Tools timer)
+let sessionTimerId = null; let sessionTimerEnd = 0;
+function startSessionTimer(seconds){
+  if (sessionTimerId) clearInterval(sessionTimerId);
+  sessionTimerEnd = Date.now() + seconds*1000;
+  updateSessionTimerDisplay();
+  sessionTimerId = setInterval(()=>{
+    if (Date.now() >= sessionTimerEnd){
+      clearInterval(sessionTimerId); sessionTimerId = null; sessionTimerEnd = 0; updateSessionTimerDisplay();
+      try { new AudioContext(); } catch(_) {}
+      return;
+    }
+    updateSessionTimerDisplay();
+  }, 200);
+}
+function stopSessionTimer(){ if (sessionTimerId){ clearInterval(sessionTimerId); sessionTimerId = null; } }
+function resetSessionTimer(){ stopSessionTimer(); sessionTimerEnd = 0; updateSessionTimerDisplay(); }
+function updateSessionTimerDisplay(){
+  if (!sessionTimerDisplay) return;
+  let remaining = Math.max(0, Math.round((sessionTimerEnd - Date.now())/1000));
+  const m = String(Math.floor(remaining/60)).padStart(2,'0');
+  const s = String(remaining%60).padStart(2,'0');
+  sessionTimerDisplay.textContent = `${m}:${s}`;
+}
+
+// Session interactions
+if (sessionSection){
+  // Timer buttons
+  if (sessionTimerStart) sessionTimerStart.addEventListener('click', ()=>{
+    const mins = Math.max(0, parseInt(sessionTimerMinutes.value)||0);
+    startSessionTimer(mins*60);
+  });
+  if (sessionTimerStop) sessionTimerStop.addEventListener('click', stopSessionTimer);
+  if (sessionTimerReset) sessionTimerReset.addEventListener('click', resetSessionTimer);
+  document.querySelectorAll('.session-preset').forEach(btn=>{
+    const secs = parseInt(btn.getAttribute('data-seconds')||'0')||0;
+    btn.addEventListener('click', ()=> startSessionTimer(secs));
+  });
+  // Set tracker
+  if (sessionExercisesTable) sessionExercisesTable.addEventListener('change', (e)=>{
+    const t = e.target;
+    if (!(t instanceof HTMLInputElement)) return;
+    if (!t.classList.contains('set-box')) return;
+    const ex = parseInt(t.getAttribute('data-ex')||'');
+    const s = parseInt(t.getAttribute('data-set')||'');
+    if (!currentSession || isNaN(ex) || isNaN(s)) return;
+    currentSession.exercises[ex].done[s] = t.checked;
+  });
+  if (sessionExercisesTable) sessionExercisesTable.addEventListener('click', (e)=>{
+    const btn = e.target.closest && e.target.closest('.sess-q-timer');
+    if (!btn) return;
+    const secs = parseInt(btn.getAttribute('data-sec')||'0')||0;
+    startSessionTimer(secs);
+  });
+  // Nav buttons
+  if (sessionBack) sessionBack.addEventListener('click', ()=>{
+    showSection('plan');
+  });
+  if (sessionSaveEnd) sessionSaveEnd.addEventListener('click', ()=>{
+    if (!currentSession) { showSection('plan'); return; }
+    const key = `${LOG_KEY_PREFIX}${currentSession.week}_${currentSession.day}`;
+    const prev = JSON.parse(localStorage.getItem(key)||'{}');
+    const notesEl = document.getElementById('sessionNotes');
+    const rpeEl = document.getElementById('sessionRpe');
+    const payload = {
+      ...prev,
+      notes: notesEl ? notesEl.value : (prev.notes||''),
+      rpe: rpeEl ? rpeEl.value : (prev.rpe||''),
+      session: {
+        name: currentSession.name,
+        exercises: currentSession.exercises.map(ex=>({ name: ex.name, sets: ex.sets, reps: ex.reps, load: ex.load, loadKg: ex.loadKg, done: ex.done }))
+      },
+      savedAt: new Date().toISOString(),
+    };
+    localStorage.setItem(key, JSON.stringify(payload));
+    // Also mark plan exercise rows as done if all sets done
+    currentSession.exercises.forEach((ex, idx)=>{
+      const doneAll = ex.done.every(Boolean);
+      const doneKey = `${PLAN_DONE_PREFIX}${currentSession.week}_${currentSession.day}_${idx}`;
+      localStorage.setItem(doneKey, doneAll ? '1' : '0');
+    });
+    // Return to log to review
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    const settings = raw ? JSON.parse(raw) : {};
+    renderLog(settings); renderProgressChart();
+    showSection('log');
+  });
 }
 
 // Simple recovery generator by day type keywords
@@ -628,72 +909,7 @@ function getRecoveryForDay(dayName){
  * Build log HTML: one entry per day per week. Loads any existing saved notes/weights.
  * @param {object} settings
  */
-function renderLog(settings) {
-  logContent.innerHTML = '';
-  // We'll allow logs for 4 days × 12 weeks
-  for (let week = 1; week <= 12; week++) {
-    if (!inSelectedRange(week)) continue;
-    const details = document.createElement('details');
-    details.open = false;
-    const summary = document.createElement('summary');
-    summary.innerHTML = `<span class="summary-title">Week ${week}</span>`;
-    details.appendChild(summary);
-    const inner = document.createElement('div');
-    inner.className = 'details-inner';
-    for (let day = 1; day <= 4; day++) {
-      const key = `${LOG_KEY_PREFIX}${week}_${day}`;
-      const saved = JSON.parse(localStorage.getItem(key) || '{}');
-      const entry = document.createElement('div');
-      entry.className = 'log-entry';
-      entry.innerHTML = `<strong>Day ${day}</strong><br/>`;
-      // Notes textarea
-      const notes = document.createElement('textarea');
-      notes.placeholder = 'Notes, weights used, how you felt...';
-      notes.value = saved.notes || '';
-      // Save button for this entry
-      const saveBtn = document.createElement('button');
-      saveBtn.textContent = 'Save Entry';
-      saveBtn.addEventListener('click', () => {
-        localStorage.setItem(key, JSON.stringify({ notes: notes.value }));
-        saveBtn.textContent = 'Saved!';
-        setTimeout(() => (saveBtn.textContent = 'Save Entry'), 2000);
-        renderProgressChart();
-      });
-      entry.appendChild(notes);
-      entry.appendChild(saveBtn);
-      // Extra small utilities per log day: quick timer and perceived exertion
-      const extras = document.createElement('div');
-      extras.className = 'log-actions';
-      const reSel = document.createElement('select');
-      reSel.innerHTML = '<option value="">RPE</option>' + Array.from({length:10},(_,i)=>`<option>${i+1}</option>`).join('');
-      if (saved.rpe) reSel.value = saved.rpe;
-      reSel.addEventListener('change', ()=>{
-        const obj = JSON.parse(localStorage.getItem(key) || '{}');
-        obj.rpe = reSel.value;
-        localStorage.setItem(key, JSON.stringify(obj));
-      });
-      const presetsWrap = document.createElement('div');
-      presetsWrap.style.display = 'flex';
-      presetsWrap.style.gap = '6px';
-      ;[
-        {label:'30s', s:30},
-        {label:'1m', s:60},
-        {label:'1:30', s:90},
-        {label:'2m', s:120},
-      ].forEach(p=>{
-        const b = document.createElement('button');
-        b.className = 'btn ghost'; b.textContent = p.label; b.addEventListener('click', ()=>startTimer(p.s));
-        presetsWrap.appendChild(b);
-      });
-      extras.appendChild(reSel);
-      extras.appendChild(presetsWrap);
-      entry.appendChild(extras);
-      inner.appendChild(entry);
-    }
-    details.appendChild(inner);
-    logContent.appendChild(details);
-  }
-}
+// Removed manual log editor; logs come from Session saves and are visualized as analytics
 
 // Expand/Collapse helpers
 function setAllDetailsOpen(container, open){
@@ -837,10 +1053,10 @@ function collectWeeklyLogCounts(){
   const weeks = Array.from({length:12}, (_,i)=>i+1);
   return weeks.map(w=>{
     let count = 0;
-    for (let d=1; d<=4; d++){
+    for (let d=1; d<=7; d++){
       const key = `${LOG_KEY_PREFIX}${w}_${d}`;
       const saved = JSON.parse(localStorage.getItem(key)||'{}');
-      if (saved.notes && saved.notes.trim()) count++;
+      if (saved && saved.savedAt) count++;
     }
     return count;
   });
@@ -875,6 +1091,82 @@ function renderProgressChart(){
     const hVal = (val/4) * chartH;
     ctx.fillRect(x, padT + chartH - hVal, barW, Math.max(2, hVal));
   });
+}
+
+// Volume chart: aggregate estimated kg lifted per week (primary lifts only)
+function collectWeeklyVolume(){
+  const weeks = Array.from({length:12}, (_,i)=>i+1);
+  const totals = weeks.map(()=>0);
+  for (let w=1; w<=12; w++){
+    for (let d=1; d<=7; d++){
+      const key = `${LOG_KEY_PREFIX}${w}_${d}`;
+      const saved = JSON.parse(localStorage.getItem(key)||'null');
+      if (!saved || !saved.session) continue;
+      const sess = saved.session;
+      // Sum simple volume estimate: for leg/chest primary lifts -> sets*reps*estimated load kg
+      (sess.exercises||[]).forEach(ex=>{
+        if (!ex || !ex.sets || !ex.reps) return;
+        // attempt to parse load like "100.0 kg" or store numeric if present
+        const loadKg = parseLoadToKg(ex.load || saved.loadLabel || '0 kg');
+        const vol = (ex.sets*ex.reps) * loadKg;
+        if (isFinite(vol)) totals[w-1] += vol;
+      });
+    }
+  }
+  return totals;
+}
+
+function parseLoadToKg(label){
+  if (!label) return 0;
+  const m = String(label).match(/([0-9]+(?:\.[0-9]+)?)\s*(kg|lb)/i);
+  if (!m) return 0;
+  let val = parseFloat(m[1]);
+  const unit = m[2].toLowerCase();
+  if (unit === 'lb') val = val/2.20462;
+  return val;
+}
+
+function renderVolumeChart(){
+  if (!volumeCanvas) return;
+  const ctx = volumeCanvas.getContext('2d');
+  const data = collectWeeklyVolume();
+  const w = volumeCanvas.width, h = volumeCanvas.height;
+  ctx.clearRect(0,0,w,h);
+  const padL = 40, padB = 30, padT = 10, padR = 10;
+  const chartW = w - padL - padR;
+  const chartH = h - padT - padB;
+  ctx.strokeStyle = '#3b3f53'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(padL, padT); ctx.lineTo(padL, padT+chartH); ctx.lineTo(padL+chartW, padT+chartH); ctx.stroke();
+  // y ticks at 5 levels
+  const maxVal = Math.max(...data, 1);
+  ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--muted');
+  ctx.font = '12px system-ui'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+  for (let i=0;i<=5;i++){
+    const v = (i/5)*maxVal;
+    const py = padT + chartH - (v/maxVal)*chartH;
+    ctx.fillText(String(Math.round(v)), padL-6, py);
+    ctx.strokeStyle = 'rgba(128,128,128,0.2)';
+    ctx.beginPath(); ctx.moveTo(padL, py); ctx.lineTo(padL+chartW, py); ctx.stroke();
+  }
+  // bars
+  const barW = chartW / (data.length*1.5);
+  ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--brand');
+  data.forEach((val, i)=>{
+    const x = padL + i * (chartW/data.length) + (chartW/data.length - barW)/2;
+    const hVal = (val/Math.max(maxVal,1)) * chartH;
+    ctx.fillRect(x, padT + chartH - hVal, barW, Math.max(2, hVal));
+  });
+}
+
+function renderStatsSummary(){
+  if (!statDays || !statVolume || !statAvg) return;
+  const counts = collectWeeklyLogCounts();
+  const days = counts.reduce((a,b)=>a+b, 0);
+  const vol = collectWeeklyVolume().reduce((a,b)=>a+b, 0);
+  const avg = days ? (vol/days) : 0;
+  statDays.textContent = String(days);
+  statVolume.textContent = Math.round(vol).toLocaleString();
+  statAvg.textContent = Math.round(avg).toLocaleString();
 }
 
 // ------------------------------
@@ -936,10 +1228,9 @@ navPlan.addEventListener('click', () => {
 });
 navLog.addEventListener('click', () => {
   showSection('log');
-  const raw = localStorage.getItem(SETTINGS_KEY);
-  const settings = raw ? JSON.parse(raw) : {};
-  renderLog(settings);
   renderProgressChart();
+  renderVolumeChart();
+  renderStatsSummary();
 });
 
 // Save button handler
@@ -949,13 +1240,14 @@ saveButton.addEventListener('click', saveSettings);
 loadSettings();
 // Render plan/log by default so users see something when switching tabs without saving
 renderPlan({ legPress1rm: 0, chestPress1rm: 0, units: 'kg', mode: 'machine' });
-renderLog({});
 initTheme();
 init1RMCalculator();
 initPlateCalculator();
 initTimer();
 initImportExport();
 renderProgressChart();
+renderVolumeChart();
+renderStatsSummary();
 renderEquipmentUI();
 
 // Custom Program UI wiring
